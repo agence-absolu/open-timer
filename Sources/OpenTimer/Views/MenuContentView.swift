@@ -22,6 +22,17 @@ struct MenuContentView: View {
     private enum Panel { case tracker, history, settings }
 
     var body: some View {
+        panelStack
+            .frame(width: 360)
+            .task { if !settings.token.isEmpty { await load() } }
+    }
+
+    /// Pile principale. L'`.id(screenKey)` force la fenêtre de `MenuBarExtra` à
+    /// se redimensionner à chaque changement d'écran : sans lui, sur macOS récents
+    /// (Tahoe), la fenêtre conserve la hauteur du plus grand panneau déjà affiché
+    /// (Historique/Réglages) et laisse une zone vide ombrée sous le tracker.
+    /// Le `.task` de chargement reste attaché au parent, donc non relancé ici.
+    private var panelStack: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             Divider()
@@ -30,8 +41,16 @@ struct MenuContentView: View {
             footer
         }
         .padding(14)
-        .frame(width: 360)
-        .task { if !settings.token.isEmpty { await load() } }
+        .id(screenKey)
+    }
+
+    /// Identité de l'écran affiché dans `mainArea`, pour piloter le redimensionnement.
+    private var screenKey: String {
+        if settings.token.isEmpty || panel == .settings { return "settings" }
+        if editingEntry != nil { return "edit" }
+        if panel == .history { return "history" }
+        if timer.isRunning { return "running" }
+        return "tracker"
     }
 
     // MARK: - Entête
@@ -93,11 +112,15 @@ struct MenuContentView: View {
     // MARK: - État « en cours »
 
     private var runningView: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let paused = timer.isPaused
+        let accent = paused ? Color.secondary : Palette.recording
+        return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Circle().fill(Palette.recording).frame(width: 8, height: 8)
-                    Text("En cours").font(.caption.weight(.medium)).foregroundStyle(Palette.recording)
+                    Image(systemName: paused ? "pause.circle.fill" : "record.circle")
+                        .foregroundStyle(accent)
+                    Text(paused ? "En pause" : "En cours")
+                        .font(.caption.weight(.medium)).foregroundStyle(accent)
                 }
                 Text(timer.activeWP?.subject ?? "—").font(.headline).lineLimit(2)
                 if let client = timer.activeWP?.projectName, !client.isEmpty {
@@ -105,19 +128,30 @@ struct MenuContentView: View {
                 }
                 Text(timer.formattedElapsed)
                     .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(paused ? Color.secondary : Color.primary)
                     .padding(.top, 2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .cardBackground(Palette.recording.opacity(0.09), radius: 12)
+            .cardBackground(accent.opacity(0.09), radius: 12)
 
-            Button {
-                let c = comment
-                Task { await timer.stop(using: settings.api, comment: c); comment = "" }
-            } label: {
-                Label("Arrêter & enregistrer", systemImage: "stop.fill")
+            HStack(spacing: 8) {
+                Button {
+                    if paused { timer.resume() } else { timer.pause() }
+                } label: {
+                    Label(paused ? "Reprendre" : "Pause",
+                          systemImage: paused ? "play.fill" : "pause.fill")
+                }
+                .buttonStyle(PrimaryButtonStyle(tint: paused ? Palette.accent : Color.secondary))
+
+                Button {
+                    let c = comment
+                    Task { await timer.stop(using: settings.api, comment: c); comment = "" }
+                } label: {
+                    Label("Arrêter", systemImage: "stop.fill")
+                }
+                .buttonStyle(PrimaryButtonStyle(tint: Palette.recording))
             }
-            .buttonStyle(PrimaryButtonStyle(tint: Palette.recording))
 
             statusLine
         }

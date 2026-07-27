@@ -14,7 +14,7 @@ struct OpenTimerApp: App {
             // Le label est réévalué à chaque tick du chrono (@Published elapsed),
             // ce qui fait défiler le temps directement dans la barre de menu.
             if timer.isRunning {
-                Text("▶ \(timer.formattedElapsed)")
+                Text("\(timer.isPaused ? "⏸" : "●") \(timer.formattedElapsed)")
             } else {
                 Image(systemName: "timer")
             }

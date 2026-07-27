@@ -76,7 +76,7 @@ private struct TimeEntryRow: View {
                 }
             }
             Spacer(minLength: 4)
-            Text(TimerManager.format(TimeInterval(entry.seconds)))
+            Text(TimerManager.formatHM(TimeInterval(entry.seconds)))
                 .font(.caption.monospacedDigit().weight(.semibold))
                 .padding(.horizontal, 7).padding(.vertical, 3)
                 .background(Palette.cardStrong, in: Capsule())
@@ -162,7 +162,7 @@ struct TimeEntryEditView: View {
                     }
                     Divider().padding(.leading, 10)
                     editorRow("Total") {
-                        Text(isValid ? TimerManager.format(TimeInterval(durationSeconds)) : "—")
+                        Text(isValid ? TimerManager.formatHM(TimeInterval(durationSeconds)) : "—")
                             .font(.body.monospacedDigit().weight(.semibold))
                             .foregroundStyle(isValid ? Color.primary : Color.red)
                     }
