@@ -10,6 +10,8 @@ struct MenuContentView: View {
     @State private var selected: WorkPackage?
     @State private var query: String = ""
     @State private var comment: String = ""
+    @State private var activities: [Activity] = []
+    @State private var selectedActivity: Activity?
     @State private var loading = false
     @State private var loadError: String?
     @State private var panel: Panel = .tracker
@@ -128,15 +130,15 @@ struct MenuContentView: View {
             searchField
             resultsList
 
-            if let wp = selected {
-                selectedBanner(wp)
+            if selected != nil {
+                activityPicker
             }
 
             TextField("Commentaire (optionnel)", text: $comment)
                 .textFieldStyle(.roundedBorder)
 
             Button {
-                if let wp = selected { timer.start(wp) }
+                if let wp = selected { timer.start(wp, activityHref: selectedActivity?.href) }
             } label: {
                 Label("Démarrer", systemImage: "play.fill")
             }
@@ -145,6 +147,26 @@ struct MenuContentView: View {
 
             statusLine
         }
+        .onChange(of: selected) { wp in
+            Task { await loadActivities(for: wp) }
+        }
+    }
+
+    private var activityPicker: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tag").foregroundStyle(.secondary)
+            Picker("Activité", selection: $selectedActivity) {
+                ForEach(activities) { activity in
+                    Text(activity.name).tag(Activity?.some(activity))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .disabled(activities.isEmpty)
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .cardBackground()
     }
 
     private var searchField: some View {
@@ -190,22 +212,6 @@ struct MenuContentView: View {
                 .frame(height: min(CGFloat(results.count) * 44 + 4, 224))
             }
         }
-    }
-
-    private func selectedBanner(_ wp: WorkPackage) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(wp.subject).font(.callout).lineLimit(1)
-                if let client = wp.projectName, !client.isEmpty {
-                    Text(client).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-            Spacer()
-            Text("#\(wp.id)").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-        }
-        .padding(8)
-        .cardBackground(Color.accentColor.opacity(0.10))
     }
 
     @ViewBuilder private var statusLine: some View {
@@ -268,6 +274,20 @@ struct MenuContentView: View {
             loadError = error.localizedDescription
         }
         loading = false
+    }
+
+    /// Charge les activités autorisées pour le WP sélectionné et présélectionne
+    /// « Développement » si disponible, sinon la première.
+    private func loadActivities(for wp: WorkPackage?) async {
+        guard let wp, let api = settings.api else {
+            activities = []
+            selectedActivity = nil
+            return
+        }
+        let list = (try? await api.activities(forWorkPackageHref: wp.href)) ?? []
+        activities = list
+        selectedActivity = list.first { $0.name.localizedCaseInsensitiveContains("Développement") }
+            ?? list.first
     }
 }
 

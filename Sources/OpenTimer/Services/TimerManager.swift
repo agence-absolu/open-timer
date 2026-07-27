@@ -13,12 +13,14 @@ final class TimerManager: ObservableObject {
 
     private var startDate: Date?
     private var ticker: AnyCancellable?
+    private var activeActivityHref: String?
 
-    func start(_ wp: WorkPackage) {
+    func start(_ wp: WorkPackage, activityHref: String? = nil) {
         guard !isRunning else { return }
         lastError = nil
         lastSaved = nil
         activeWP = wp
+        activeActivityHref = activityHref
         startDate = Date()
         elapsed = 0
         isRunning = true
@@ -46,14 +48,17 @@ final class TimerManager: ObservableObject {
         let hours = OpenProjectAPI.isoDuration(seconds: seconds)
         let today = Formatters.ymd.string(from: Date())
         do {
-            // L'activité est requise selon la config OP ; on prend la première autorisée.
-            let activity = try? await api.activities(forWorkPackageHref: wp.href).first
+            // Activité choisie au démarrage ; sinon la première autorisée (requise par OP).
+            var activityHref = activeActivityHref
+            if activityHref == nil {
+                activityHref = (try? await api.activities(forWorkPackageHref: wp.href))?.first?.href
+            }
             try await api.createTimeEntry(
                 workPackageHref: wp.href,
                 hours: hours,
                 spentOn: today,
                 comment: comment,
-                activityHref: activity?.href
+                activityHref: activityHref
             )
             lastSaved = "Enregistré : \(hours) sur #\(wp.id)"
             lastError = nil
@@ -67,6 +72,7 @@ final class TimerManager: ObservableObject {
         elapsed = 0
         startDate = nil
         activeWP = nil
+        activeActivityHref = nil
     }
 
     var formattedElapsed: String { Self.format(elapsed) }
