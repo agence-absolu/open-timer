@@ -9,9 +9,13 @@ cask "opentimer" do
 
   app "OpenTimer.app"
 
-  # App non signée / non notarisée : penser à installer avec --no-quarantine
-  #   brew install --cask --no-quarantine opentimer
-  # Sinon macOS bloquera l'app (« endommagée »).
+  # App non signée / non notarisée : le flag --no-quarantine a été retiré de
+  # Homebrew (v4.7). On retire donc l'attribut de quarantaine après l'install,
+  # sinon macOS bloquerait l'app (« endommagée »).
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", "#{appdir}/OpenTimer.app"]
+  end
 
   zap trash: [
     "~/Library/Preferences/com.lmwr.opentimer.plist",

@@ -36,9 +36,12 @@ L'URL du zip dans le cask doit correspondre :
 # 1) Ajouter le tap (repo à nom libre → on donne l'URL explicite, une seule fois)
 brew tap agence-absolu/open-timer https://github.com/agence-absolu/open-timer
 
-# 2) Installer (app non signée → --no-quarantine indispensable)
-brew install --cask --no-quarantine opentimer
+# 2) Installer
+brew install --cask opentimer
 ```
+
+L'app étant non signée, le cask retire lui-même la quarantaine (stanza
+`postflight`). Le flag `--no-quarantine` n'existe plus depuis Homebrew 4.7.
 
 Lancer ensuite **OpenTimer** (barre de menu). Config : coller l'URL de l'instance
 OpenProject et un token API.
@@ -52,8 +55,8 @@ brew upgrade --cask opentimer     # récupère la nouvelle version
 
 ## Notes
 
-- **App non signée** : `--no-quarantine` évite le blocage Gatekeeper
-  (« application endommagée »). Pour supprimer ce prérequis à terme : signer avec
-  un Apple Developer ID (99 $/an) puis notariser — le cask pourra alors s'installer
-  sans `--no-quarantine`.
+- **App non signée** : le cask retire la quarantaine via `postflight` (le flag
+  `--no-quarantine` a été supprimé de Homebrew en 4.7). Pour supprimer ce bricolage
+  à terme : signer avec un Apple Developer ID (99 $/an) puis notariser — le
+  `postflight` deviendra alors inutile.
 - Le zip est régénéré par `release.sh` avec `ditto` (préserve la signature ad-hoc).
