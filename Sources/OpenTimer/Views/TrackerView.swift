@@ -38,6 +38,15 @@ struct TrackerView: View {
         .frame(width: 360)
         .windowSurface()
         .task(id: settings.token) { if !settings.token.isEmpty && workPackages.isEmpty { await load() } }
+        .onChange(of: timer.isRunning) { running in
+            // À l'arrêt du chrono, on désélectionne le WP pour éviter de relancer
+            // un timer par inadvertance : il faut resélectionner explicitement.
+            if !running {
+                selected = nil
+                activities = []
+                selectedActivity = nil
+            }
+        }
     }
 
     // MARK: - Connexion manquante
