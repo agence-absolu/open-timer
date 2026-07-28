@@ -1,4 +1,28 @@
+import AppKit
 import Foundation
+
+/// Thème d'affichage choisi par l'utilisateur, appliqué à toute l'app.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "Système"
+        case .light: return "Clair"
+        case .dark: return "Sombre"
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 /// Détient l'URL de l'instance et le token, persistés dans les préférences de l'app,
 /// et fabrique un client API prêt à l'emploi.
@@ -16,8 +40,18 @@ final class SettingsStore: ObservableObject {
     }
     @Published var token: String
 
+    /// Thème d'affichage, appliqué à toute l'app dès sa modification.
+    @Published var appearance: AppAppearance {
+        didSet {
+            UserDefaults.standard.set(appearance.rawValue, forKey: "appearance")
+            applyAppearance()
+        }
+    }
+
     init() {
         self.baseURL = UserDefaults.standard.string(forKey: "baseURL") ?? ""
+        self.appearance = UserDefaults.standard.string(forKey: "appearance")
+            .flatMap(AppAppearance.init(rawValue:)) ?? .system
 
         if let stored = UserDefaults.standard.string(forKey: Self.tokenKey), !stored.isEmpty {
             self.token = stored
@@ -29,6 +63,8 @@ final class SettingsStore: ObservableObject {
         } else {
             self.token = ""
         }
+
+        applyAppearance()
     }
 
     func saveToken() {
@@ -36,10 +72,23 @@ final class SettingsStore: ObservableObject {
         KeychainStore.delete("apiToken")
     }
 
+    /// Applique le thème choisi à l'ensemble de l'app (menu + fenêtres).
+    func applyAppearance() {
+        NSApplication.shared.appearance = appearance.nsAppearance
+    }
+
     /// Client API, ou `nil` si l'URL ou le token ne sont pas exploitables.
     var api: OpenProjectAPI? {
         let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
         guard let url = URL(string: trimmed), url.scheme != nil, !token.isEmpty else { return nil }
         return OpenProjectAPI(baseURL: url, token: token)
+    }
+
+    /// URL web du work package sur l'instance OpenProject : `BASE_URL/wp/{ID}`.
+    func workPackageURL(id: Int) -> URL? {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        let base = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        return URL(string: "\(base)/wp/\(id)")
     }
 }

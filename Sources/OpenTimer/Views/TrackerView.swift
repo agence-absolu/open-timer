@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// Panneau déroulant de la barre de menu.
-struct MenuContentView: View {
+/// Fenêtre « Nouveau » : recherche d'un work package et démarrage du chrono,
+/// ou vue « en cours » quand une session est active.
+struct TrackerView: View {
     @EnvironmentObject var timer: TimerManager
     @EnvironmentObject var settings: SettingsStore
+    @Environment(\.openWindow) private var openWindow
 
     @State private var workPackages: [WorkPackage] = []
     @State private var selected: WorkPackage?
@@ -14,98 +16,33 @@ struct MenuContentView: View {
     @State private var selectedActivity: Activity?
     @State private var loading = false
     @State private var loadError: String?
-    @State private var panel: Panel = .tracker
-    @State private var editingEntry: TimeEntry?
-    @State private var historyReload = 0
-    @State private var launchAtLogin = LaunchAtLogin.isEnabled
-
-    private enum Panel { case tracker, history, settings }
 
     var body: some View {
-        panelStack
-            .frame(width: 360)
-            .task { if !settings.token.isEmpty { await load() } }
-    }
-
-    /// Pile principale. L'`.id(screenKey)` force la fenêtre de `MenuBarExtra` à
-    /// se redimensionner à chaque changement d'écran : sans lui, sur macOS récents
-    /// (Tahoe), la fenêtre conserve la hauteur du plus grand panneau déjà affiché
-    /// (Historique/Réglages) et laisse une zone vide ombrée sous le tracker.
-    /// Le `.task` de chargement reste attaché au parent, donc non relancé ici.
-    private var panelStack: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            Divider()
-            mainArea
-            Divider()
-            footer
-        }
-        .padding(14)
-        .id(screenKey)
-    }
-
-    /// Identité de l'écran affiché dans `mainArea`, pour piloter le redimensionnement.
-    private var screenKey: String {
-        if settings.token.isEmpty || panel == .settings { return "settings" }
-        if editingEntry != nil { return "edit" }
-        if panel == .history { return "history" }
-        if timer.isRunning { return "running" }
-        return "tracker"
-    }
-
-    // MARK: - Entête
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "timer")
-                .foregroundStyle(timer.isRunning ? Palette.recording : Color.accentColor)
-            Text("OpenTimer").font(.headline)
-
-            if timer.isRunning {
-                Text(timer.formattedElapsed)
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(Palette.recording)
-                    .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(Palette.recording.opacity(0.14), in: Capsule())
+            if settings.token.isEmpty {
+                needsSetup
+            } else if timer.isRunning {
+                runningView
+            } else {
+                trackerView
             }
-
-            Spacer()
-
-            if !settings.token.isEmpty {
-                navButton(icon: "clock.arrow.circlepath", target: .history, help: "Dernières saisies")
-            }
-            navButton(icon: "gearshape", target: .settings, help: "Réglages")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .frame(width: 360)
+        .windowSurface()
+        .task(id: settings.token) { if !settings.token.isEmpty && workPackages.isEmpty { await load() } }
     }
 
-    private func navButton(icon: String, target: Panel, help: String) -> some View {
-        Button {
-            editingEntry = nil
-            panel = (panel == target) ? .tracker : target
-        } label: {
-            Image(systemName: icon)
-                .foregroundStyle(panel == target ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
-        .help(help)
-    }
+    // MARK: - Connexion manquante
 
-    // MARK: - Zone principale
-
-    @ViewBuilder private var mainArea: some View {
-        if settings.token.isEmpty || panel == .settings {
-            SettingsView(onSaved: { panel = .tracker; Task { await load() } })
-        } else if let entry = editingEntry {
-            TimeEntryEditView(entry: entry, api: settings.api) {
-                editingEntry = nil
-                historyReload += 1
-            }
-        } else if panel == .history {
-            HistoryView(api: settings.api, reloadToken: historyReload) { editingEntry = $0 }
-        } else if timer.isRunning {
-            runningView
-        } else {
-            trackerView
+    private var needsSetup: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Connexion non configurée", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout).foregroundStyle(.orange)
+            Text("Renseigne l'URL de ton instance et ton token API dans les Préférences.")
+                .font(.caption).foregroundStyle(.secondary)
+            Button("Ouvrir les Préférences") { openWindow(id: WindowID.preferences) }
         }
     }
 
@@ -121,6 +58,10 @@ struct MenuContentView: View {
                         .foregroundStyle(accent)
                     Text(paused ? "En pause" : "En cours")
                         .font(.caption.weight(.medium)).foregroundStyle(accent)
+                    Spacer()
+                    if let wp = timer.activeWP, let url = settings.workPackageURL(id: wp.id) {
+                        OpenProjectLink(url: url, compact: true)
+                    }
                 }
                 Text(timer.activeWP?.subject ?? "—").font(.headline).lineLimit(2)
                 if let client = timer.activeWP?.projectName, !client.isEmpty {
@@ -237,9 +178,13 @@ struct MenuContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 3) {
                         ForEach(results) { wp in
-                            WorkPackageRow(wp: wp, isSelected: selected?.id == wp.id)
-                                .contentShape(Rectangle())
-                                .onTapGesture { selected = (selected?.id == wp.id) ? nil : wp }
+                            WorkPackageRow(
+                                wp: wp,
+                                isSelected: selected?.id == wp.id,
+                                url: settings.workPackageURL(id: wp.id)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { selected = (selected?.id == wp.id) ? nil : wp }
                         }
                     }
                 }
@@ -256,26 +201,6 @@ struct MenuContentView: View {
         if let saved = timer.lastSaved {
             Label(saved, systemImage: "checkmark.circle.fill")
                 .font(.caption).foregroundStyle(.green)
-        }
-    }
-
-    // MARK: - Pied
-
-    private var footer: some View {
-        HStack {
-            Toggle(isOn: $launchAtLogin) {
-                Text("Lancer au démarrage").font(.caption)
-            }
-            .toggleStyle(.checkbox)
-            .onChange(of: launchAtLogin) { newValue in
-                do { try LaunchAtLogin.set(newValue) }
-                catch { launchAtLogin = LaunchAtLogin.isEnabled }
-            }
-            Spacer()
-            Button { NSApplication.shared.terminate(nil) } label: {
-                Label("Quitter", systemImage: "power").font(.caption)
-            }
-            .buttonStyle(.plain).foregroundStyle(.secondary)
         }
     }
 
@@ -297,7 +222,7 @@ struct MenuContentView: View {
 
     private func load() async {
         guard let api = settings.api else {
-            loadError = "Token manquant — ouvre les Réglages."
+            loadError = "Token manquant — ouvre les Préférences."
             return
         }
         loading = true
@@ -325,10 +250,11 @@ struct MenuContentView: View {
     }
 }
 
-/// Ligne de résultat de recherche : libellé + ID/client, coche si sélectionné.
+/// Ligne de résultat de recherche : libellé + ID/client, lien OpenProject, coche si sélectionné.
 private struct WorkPackageRow: View {
     let wp: WorkPackage
     let isSelected: Bool
+    let url: URL?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -343,6 +269,7 @@ private struct WorkPackageRow: View {
                 .font(.caption2).foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
+            if let url { OpenProjectLink(url: url, compact: true) }
             if isSelected {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
             }

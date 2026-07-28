@@ -1,9 +1,51 @@
 import SwiftUI
 
+/// Fenêtre « Historique » : liste des saisies, et bascule vers l'éditeur au clic.
+struct HistoryWindowView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @State private var editingEntry: TimeEntry?
+    @State private var historyReload = 0
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(16)
+            .frame(width: 460, height: 480)
+            .windowSurface()
+    }
+
+    @ViewBuilder private var content: some View {
+        if settings.token.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Connexion non configurée", systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(.orange)
+                Text("Renseigne l'URL et le token dans les Préférences.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        } else if let entry = editingEntry {
+            TimeEntryEditView(
+                entry: entry,
+                api: settings.api,
+                url: entry.workPackageID.flatMap(settings.workPackageURL)
+            ) {
+                editingEntry = nil
+                historyReload += 1
+            }
+        } else {
+            HistoryView(
+                api: settings.api,
+                reloadToken: historyReload,
+                wpURL: settings.workPackageURL
+            ) { editingEntry = $0 }
+        }
+    }
+}
+
 /// Liste des dernières saisies de temps ; un clic ouvre l'éditeur.
 struct HistoryView: View {
     let api: OpenProjectAPI?
     let reloadToken: Int
+    var wpURL: (Int) -> URL? = { _ in nil }
     var onEdit: (TimeEntry) -> Void
 
     @State private var entries: [TimeEntry] = []
@@ -37,15 +79,16 @@ struct HistoryView: View {
                 ScrollView {
                     LazyVStack(spacing: 3) {
                         ForEach(entries) { entry in
-                            TimeEntryRow(entry: entry)
+                            TimeEntryRow(entry: entry, url: entry.workPackageID.flatMap(wpURL))
                                 .contentShape(Rectangle())
                                 .onTapGesture { onEdit(entry) }
                         }
                     }
                 }
-                .frame(maxHeight: 300)
+                .frame(maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task(id: reloadToken) { await load() }
     }
 
@@ -61,6 +104,7 @@ struct HistoryView: View {
 
 private struct TimeEntryRow: View {
     let entry: TimeEntry
+    let url: URL?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -76,6 +120,7 @@ private struct TimeEntryRow: View {
                 }
             }
             Spacer(minLength: 4)
+            if let url { OpenProjectLink(url: url, compact: true) }
             Text(TimerManager.formatHM(TimeInterval(entry.seconds)))
                 .font(.caption.monospacedDigit().weight(.semibold))
                 .padding(.horizontal, 7).padding(.vertical, 3)
@@ -93,6 +138,7 @@ private struct TimeEntryRow: View {
 struct TimeEntryEditView: View {
     let entry: TimeEntry
     let api: OpenProjectAPI?
+    let url: URL?
     var onDone: () -> Void
 
     @State private var comment: String
@@ -103,9 +149,10 @@ struct TimeEntryEditView: View {
     @State private var error: String?
     @State private var confirmDelete = false
 
-    init(entry: TimeEntry, api: OpenProjectAPI?, onDone: @escaping () -> Void) {
+    init(entry: TimeEntry, api: OpenProjectAPI?, url: URL? = nil, onDone: @escaping () -> Void) {
         self.entry = entry
         self.api = api
+        self.url = url
         self.onDone = onDone
         _comment = State(initialValue: entry.comment)
 
@@ -131,11 +178,15 @@ struct TimeEntryEditView: View {
             }
 
             // Work package concerné
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.workPackageTitle ?? "—").font(.callout.weight(.medium)).lineLimit(2)
-                if let p = entry.projectTitle, !p.isEmpty {
-                    Text(p).font(.caption2).foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.workPackageTitle ?? "—").font(.callout.weight(.medium)).lineLimit(2)
+                    if let p = entry.projectTitle, !p.isEmpty {
+                        Text(p).font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
+                Spacer(minLength: 4)
+                if let url { OpenProjectLink(url: url, compact: true) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)

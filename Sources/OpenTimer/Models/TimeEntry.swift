@@ -13,6 +13,12 @@ struct TimeEntry: Identifiable, Hashable {
     let endTime: Date?    // instant de fin en UTC (idem)
     let lockVersion: Int?
 
+    /// ID numérique du work package, extrait du href HAL (`/api/v3/work_packages/{id}`).
+    var workPackageID: Int? {
+        guard let last = workPackageHref?.split(separator: "/").last else { return nil }
+        return Int(last)
+    }
+
     /// Date reformatée jj/MM/aaaa pour l'affichage.
     var displayDate: String {
         guard let d = Formatters.ymd.date(from: spentOn) else { return spentOn }

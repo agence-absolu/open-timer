@@ -1,6 +1,6 @@
 cask "opentimer" do
-  version "0.4.0"
-  sha256 "e193d09f3ec89e11eb28ff1d2039a6ca41facba65da287b07ab0995f4b0e1310"
+  version "0.5.0"
+  sha256 "04bc1659e8994aeace69ed421aed632a514809f6579ab4bfd8617830c7730557"
 
   url "https://github.com/agence-absolu/open-timer/releases/download/v#{version}/OpenTimer-#{version}.zip"
   name "OpenTimer"
