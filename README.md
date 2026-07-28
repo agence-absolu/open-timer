@@ -5,8 +5,10 @@ Choisis un work package parmi ceux qui te sont assignés, lance le chrono (le te
 défile directement dans la barre de menu), et à l'arrêt un *time entry* est créé
 automatiquement dans OpenProject via l'API REST v3.
 
-- App **menu-bar-only** (pas d'icône dans le Dock).
-- Token stocké dans le **trousseau macOS**.
+- Vit dans la **barre de menu** (le chrono y défile) et dispose d'une **icône dans le
+  Dock** (alternée quand une session tourne).
+- Token stocké dans les **préférences de l'app** (`UserDefaults`) — l'app étant signée
+  ad-hoc, sa signature change à chaque build, ce qui rendait le trousseau peu fiable.
 - Zéro dépendance externe, binaire natif ~quelques Mo.
 
 ## Prérequis
@@ -31,28 +33,48 @@ et le signe en ad-hoc pour un lancement local.
 ## Configuration
 
 1. Dans OpenProject : **Mon compte → Jetons d'accès → API** → crée un token.
-2. Lance OpenTimer, ouvre les **Réglages** (icône engrenage).
+2. Lance OpenTimer, clique l'icône de la barre de menu → **Préférences…**.
 3. Saisis l'URL de ton instance (`https://…openproject.com`), colle le token,
    clique **Tester** — tu dois voir ton nom — puis **Enregistrer**.
 
+Les **Préférences** permettent aussi de choisir le **thème** (Système / Clair / Sombre)
+et d'activer le **lancement au démarrage** de la session.
+
 ## Utilisation
 
-1. Choisis un work package dans la liste (tes WP assignés, statut ouvert).
-2. **Démarrer** → le chrono défile dans la barre de menu (`▶ 0:01:23`).
-3. **Arrêter & enregistrer** → time entry créé sur le WP (durée arrondie à la
-   minute, activité = première autorisée, date du jour).
+1. Icône de la barre de menu → **Nouveau** (ou clic sur l'icône du Dock).
+2. Choisis un work package dans la liste (tes WP assignés, statut ouvert), une
+   **activité** (« Développement » présélectionnée si dispo) et un commentaire optionnel.
+   Coche **Tous les work packages** pour élargir la recherche à ceux assignés à
+   d'autres (recherche serveur : libellé, ou id exact si tu tapes un numéro).
+3. **Démarrer** → le chrono défile dans la barre de menu (`● 0:01:23`). Tu peux
+   **mettre en pause / reprendre** ; l'icône du Dock indique la session active.
+4. **Arrêter** → time entry créé sur le WP (durée arrondie à la minute, date du jour).
 
 ## Corriger une saisie (oubli d'arrêt)
 
-Icône **horloge** dans l'entête → **Dernières saisies**. Clique une saisie pour
-l'éditer : **Début** et **Fin** ajustables, la **Durée se recalcule** (Fin − Début).
-Pratique quand on a oublié d'arrêter : on corrige la Fin, la durée suit.
+Icône de la barre de menu → **Historique**. Clique une saisie pour l'éditer :
+**Début** et **Fin** ajustables, la **Durée se recalcule** (Fin − Début). Pratique
+quand on a oublié d'arrêter : on corrige la Fin, la durée suit. On peut aussi
+**supprimer** une saisie.
 
 > Les heures de début/fin ne sont écrites dans OpenProject que si l'admin a activé
 > l'option *« heures de début et de fin »* (Administration → Suivi du temps). Sinon,
 > seules la **durée** et la **date** sont enregistrées (l'app te le signale).
 
-## Installer dans /Applications
+## Installer
+
+### Via Homebrew (recommandé)
+
+```bash
+brew tap agence-absolu/open-timer https://github.com/agence-absolu/open-timer
+brew install --cask opentimer
+```
+
+Mise à jour : `brew update && brew upgrade --cask opentimer`. Voir `DEPLOY.md` pour le
+processus de release. L'app étant non signée, le cask retire lui-même la quarantaine.
+
+### Manuellement
 
 ```bash
 cp -R OpenTimer.app /Applications/
@@ -60,7 +82,7 @@ cp -R OpenTimer.app /Applications/
 
 ## Pistes suivantes
 
-- Notarisation Developer ID + **cask Homebrew** publié (nécessite un compte Apple
-  Developer, 99 $/an).
-- Choix de l'activité, édition/suppression de time entries, reprise après crash,
-  raccourci clavier global, lancement au démarrage.
+- Notarisation **Developer ID** (nécessite un compte Apple Developer, 99 $/an) : lèverait
+  le blocage au premier lancement, le `postflight` du cask et permettrait de revenir au
+  trousseau pour le token.
+- Reprise du chrono après crash, raccourci clavier global.

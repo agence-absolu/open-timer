@@ -17,6 +17,12 @@ struct TrackerView: View {
     @State private var loading = false
     @State private var loadError: String?
 
+    /// Élargit la recherche à tous les WP ouverts (pas seulement les miens) via une
+    /// requête serveur ; sinon on filtre localement mes WP assignés.
+    @State private var searchAll = false
+    @State private var remoteResults: [WorkPackage] = []
+    @State private var searchTask: Task<Void, Never>?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if settings.token.isEmpty {
@@ -103,6 +109,7 @@ struct TrackerView: View {
     private var trackerView: some View {
         VStack(alignment: .leading, spacing: 10) {
             searchField
+            scopeToggle
             resultsList
 
             if selected != nil {
@@ -125,6 +132,26 @@ struct TrackerView: View {
         .onChange(of: selected) { wp in
             Task { await loadActivities(for: wp) }
         }
+        .onChange(of: query) { _ in if searchAll { scheduleRemoteSearch() } }
+        .onChange(of: searchAll) { on in
+            selected = nil
+            if on {
+                scheduleRemoteSearch(immediate: true)
+            } else {
+                searchTask?.cancel()
+                remoteResults = []
+                loading = false
+            }
+        }
+    }
+
+    /// Bascule « mes WP » ↔ « tous les WP ».
+    private var scopeToggle: some View {
+        Toggle(isOn: $searchAll) {
+            Text("Tous les work packages (assignés à d'autres inclus)")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .toggleStyle(.checkbox)
     }
 
     private var activityPicker: some View {
@@ -153,9 +180,9 @@ struct TrackerView: View {
                 Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
             }
-            Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+            Button { reload() } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                .help("Recharger mes work packages")
+                .help(searchAll ? "Relancer la recherche" : "Recharger mes work packages")
         }
         .padding(8)
         .cardBackground()
@@ -171,7 +198,7 @@ struct TrackerView: View {
         } else {
             let results = filtered
             if results.isEmpty {
-                Text(query.isEmpty ? "Aucun work package assigné et ouvert." : "Aucun résultat pour « \(query) ».")
+                Text(emptyMessage)
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 10)
             } else {
@@ -206,8 +233,10 @@ struct TrackerView: View {
 
     // MARK: - Données
 
-    /// Filtre local : chaque terme doit se retrouver dans « <id> <libellé> <client> ».
+    /// Résultats affichés : en mode élargi, ceux de la recherche serveur ; sinon un
+    /// filtre local où chaque terme doit se retrouver dans « <id> <libellé> <client> ».
     private var filtered: [WorkPackage] {
+        if searchAll { return remoteResults }
         let terms = query
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .split(separator: " ")
@@ -218,6 +247,52 @@ struct TrackerView: View {
                 .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             return terms.allSatisfy { haystack.contains($0) }
         }
+    }
+
+    /// Message affiché quand la liste est vide, selon le mode et l'état de la saisie.
+    private var emptyMessage: String {
+        let hasQuery = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        if searchAll {
+            return hasQuery ? "Aucun résultat pour « \(query) »."
+                            : "Tape pour rechercher parmi tous les work packages."
+        }
+        return hasQuery ? "Aucun résultat pour « \(query) »." : "Aucun work package assigné et ouvert."
+    }
+
+    /// Recharge : recherche serveur en mode élargi, sinon rechargement de mes WP.
+    private func reload() {
+        if searchAll { scheduleRemoteSearch(immediate: true) }
+        else { Task { await load() } }
+    }
+
+    /// Planifie une recherche serveur, avec un léger debounce pour la frappe.
+    private func scheduleRemoteSearch(immediate: Bool = false) {
+        searchTask?.cancel()
+        let q = query
+        searchTask = Task {
+            if !immediate {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                if Task.isCancelled { return }
+            }
+            await runRemoteSearch(q)
+        }
+    }
+
+    private func runRemoteSearch(_ q: String) async {
+        let trimmed = q.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { remoteResults = []; loading = false; return }
+        guard let api = settings.api else {
+            loadError = "Token manquant — ouvre les Préférences."
+            return
+        }
+        loading = true
+        loadError = nil
+        do {
+            remoteResults = try await api.searchWorkPackages(matching: trimmed)
+        } catch {
+            if !Task.isCancelled { loadError = error.localizedDescription }
+        }
+        loading = false
     }
 
     private func load() async {

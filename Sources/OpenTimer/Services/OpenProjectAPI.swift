@@ -26,14 +26,46 @@ struct OpenProjectAPI {
 
     /// Work packages assignés à l'utilisateur courant et dont le statut est ouvert.
     func myWorkPackages() async throws -> [WorkPackage] {
-        let filters = #"[{"assignee":{"operator":"=","values":["me"]}},{"status":{"operator":"o","values":[]}}]"#
+        try await fetchWorkPackages(filters: [
+            ["assignee": ["operator": "=", "values": ["me"]]],
+            ["status": ["operator": "o", "values": []]],
+        ])
+    }
+
+    /// Recherche parmi tous les WP ouverts — assignés ou non. Sert à travailler sur un
+    /// work package assigné à quelqu'un d'autre.
+    ///
+    /// Saisie purement numérique (avec « # » optionnel) → recherche par **id exact**
+    /// (le filtre plein-texte `**` ne matche pas les identifiants) ; on ne restreint
+    /// alors pas au statut ouvert, pour retrouver le WP même s'il est clos. Sinon,
+    /// recherche plein-texte (libellé…) sur les WP ouverts.
+    func searchWorkPackages(matching query: String, limit: Int = 50) async throws -> [WorkPackage] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
+
+        let digits = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+        if !digits.isEmpty, digits.allSatisfy(\.isNumber) {
+            return try await fetchWorkPackages(filters: [
+                ["id": ["operator": "=", "values": [digits]]],
+            ], pageSize: limit)
+        }
+
+        return try await fetchWorkPackages(filters: [
+            ["search": ["operator": "**", "values": [trimmed]]],
+            ["status": ["operator": "o", "values": []]],
+        ], pageSize: limit)
+    }
+
+    /// Requête `work_packages` filtrée, triée par mise à jour décroissante.
+    private func fetchWorkPackages(filters: [[String: Any]], pageSize: Int = 100) async throws -> [WorkPackage] {
+        let filtersJSON = String(decoding: try JSONSerialization.data(withJSONObject: filters), as: UTF8.self)
         var comps = URLComponents(
             url: baseURL.appendingPathComponent("api/v3/work_packages"),
             resolvingAgainstBaseURL: false
         )!
         comps.queryItems = [
-            URLQueryItem(name: "pageSize", value: "100"),
-            URLQueryItem(name: "filters", value: filters),
+            URLQueryItem(name: "pageSize", value: "\(pageSize)"),
+            URLQueryItem(name: "filters", value: filtersJSON),
             URLQueryItem(name: "sortBy", value: #"[["updatedAt","desc"]]"#),
         ]
         // URLComponents encode l'espace en '+' dans la query ; OpenProject veut %2B.
