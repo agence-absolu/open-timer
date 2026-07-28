@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -5,7 +6,9 @@ import Foundation
 /// time entry dans OpenProject à l'arrêt.
 @MainActor
 final class TimerManager: ObservableObject {
-    @Published private(set) var isRunning = false
+    @Published private(set) var isRunning = false {
+        didSet { updateDockIcon() }
+    }
     @Published private(set) var isPaused = false
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var activeWP: WorkPackage?
@@ -112,6 +115,19 @@ final class TimerManager: ObservableObject {
         isPaused = false
         activeWP = nil
         activeActivityHref = nil
+    }
+
+    /// Intervertit l'icône du Dock selon l'état du chrono : icône « running »
+    /// tant qu'une session est active (y compris en pause), icône du bundle sinon.
+    /// `= nil` restaure l'icône par défaut déclarée dans l'Info.plist.
+    private func updateDockIcon() {
+        if isRunning,
+           let url = Bundle.main.url(forResource: "OpenTimerRunning", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            NSApplication.shared.applicationIconImage = image
+        } else {
+            NSApplication.shared.applicationIconImage = nil
+        }
     }
 
     var formattedElapsed: String { Self.format(elapsed) }

@@ -16,6 +16,7 @@ mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cp "$BIN" "$BUNDLE/Contents/MacOS/$APP"
 cp Resources/Info.plist "$BUNDLE/Contents/Info.plist"
 cp Resources/AppIcon.icns "$BUNDLE/Contents/Resources/AppIcon.icns"
+cp Resources/OpenTimerRunning.icns "$BUNDLE/Contents/Resources/OpenTimerRunning.icns"
 
 echo "▸ Signature ad-hoc (lancement local)…"
 codesign --force --deep --sign - "$BUNDLE"
