@@ -79,8 +79,14 @@ struct TrackerView: View {
                     }
                 }
                 Text(timer.activeWP?.subject ?? "—").font(.headline).lineLimit(2)
-                if let client = timer.activeWP?.projectName, !client.isEmpty {
-                    Text(client).font(.caption).foregroundStyle(.secondary)
+                if let wp = timer.activeWP {
+                    HStack(spacing: 5) {
+                        Text("#\(wp.id)").monospacedDigit()
+                        if let client = wp.projectName, !client.isEmpty {
+                            Text("· \(client)").lineLimit(1)
+                        }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
                 }
                 Text(timer.formattedElapsed)
                     .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
@@ -117,6 +123,7 @@ struct TrackerView: View {
 
     private var trackerView: some View {
         VStack(alignment: .leading, spacing: 10) {
+            completionCard
             searchField
             scopeToggle
             resultsList
@@ -178,6 +185,53 @@ struct TrackerView: View {
         }
         .padding(8)
         .cardBackground()
+    }
+
+    /// Proposition de clôture affichée après l'arrêt du chrono : passer le WP en
+    /// « Traité » et le réaffecter à son créateur (voir `TimerManager.pendingCompletion`).
+    @State private var applying = false
+
+    @ViewBuilder private var completionCard: some View {
+        if let pending = timer.pendingCompletion {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal")
+                        .foregroundStyle(Palette.accent)
+                    Text("Clôturer #\(pending.wp.id) ?")
+                        .font(.callout.weight(.medium))
+                }
+                Text(completionDetail(pending))
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Button("Ignorer") { timer.dismissPendingCompletion() }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .disabled(applying)
+                    Spacer(minLength: 0)
+                    if applying {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button("Confirmer") {
+                        Task {
+                            applying = true
+                            await timer.applyPendingCompletion(using: settings.api)
+                            applying = false
+                        }
+                    }
+                    .disabled(applying)
+                }
+            }
+            .padding(12)
+            .cardBackground(Palette.cardStrong)
+        }
+    }
+
+    /// Détaille les actions de la proposition (« → statut … · réaffecter à … »).
+    private func completionDetail(_ p: TimerManager.PendingCompletion) -> String {
+        var parts: [String] = []
+        if p.statusHref != nil { parts.append("statut « \(p.statusName) »") }
+        if let name = p.assigneeName { parts.append("réaffecter à \(name)") }
+        else if p.assigneeHref != nil { parts.append("réaffecter au créateur") }
+        return parts.isEmpty ? "" : "→ " + parts.joined(separator: "  ·  ")
     }
 
     private var searchField: some View {

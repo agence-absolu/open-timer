@@ -168,6 +168,71 @@ struct OpenProjectAPI {
         _ = try await send(request(path: "api/v3/time_entries/\(id)", method: "DELETE"))
     }
 
+    // MARK: - Clôture d'un work package
+
+    /// Nom du statut proposé à la clôture d'un WP (voir `TimerManager.PendingCompletion`).
+    static let doneStatusName = "Traité"
+
+    /// Détail minimal d'un WP nécessaire au PATCH de clôture : `lockVersion` (verrou
+    /// optimiste requis par OpenProject) et lien vers le créateur (author).
+    struct WorkPackageCompletion {
+        let lockVersion: Int
+        let authorHref: String?
+        let authorName: String?
+    }
+
+    /// Lit `lockVersion` et l'auteur d'un WP depuis sa représentation HAL.
+    func workPackageCompletion(forHref href: String) async throws -> WorkPackageCompletion {
+        let data = try await send(request(path: Self.stripLeadingSlash(href)))
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let author = (obj?["_links"] as? [String: Any])?["author"] as? [String: Any]
+        return WorkPackageCompletion(
+            lockVersion: obj?["lockVersion"] as? Int ?? 0,
+            authorHref: author?["href"] as? String,
+            authorName: author?["title"] as? String
+        )
+    }
+
+    /// Href du statut portant ce nom (comparaison insensible à la casse et aux accents),
+    /// `nil` si l'instance n'a pas de statut de ce nom.
+    func statusHref(named name: String) async throws -> String? {
+        let data = try await send(request(path: "api/v3/statuses"))
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let elements = (obj?["_embedded"] as? [String: Any])?["elements"] as? [[String: Any]] ?? []
+        let target = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        for el in elements {
+            let n = (el["name"] as? String)?
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            if n == target {
+                let selfLink = (el["_links"] as? [String: Any])?["self"] as? [String: Any]
+                return selfLink?["href"] as? String
+            }
+        }
+        return nil
+    }
+
+    /// PATCH un WP : statut et/ou assigné. `lockVersion` doit être la version courante
+    /// (verrou optimiste). Les liens `nil` sont laissés inchangés.
+    func updateWorkPackage(
+        href: String,
+        lockVersion: Int,
+        statusHref: String?,
+        assigneeHref: String?
+    ) async throws {
+        var links: [String: Any] = [:]
+        if let statusHref { links["status"] = ["href": statusHref] }
+        if let assigneeHref { links["assignee"] = ["href": assigneeHref] }
+        let payload: [String: Any] = ["lockVersion": lockVersion, "_links": links]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        _ = try await send(request(path: Self.stripLeadingSlash(href), method: "PATCH", body: body))
+    }
+
+    /// Un href HAL commence par « / » ; `request(path:)` l'ajoute à `baseURL`, on retire donc
+    /// la barre initiale pour éviter une double barre.
+    private static func stripLeadingSlash(_ href: String) -> String {
+        href.hasPrefix("/") ? String(href.dropFirst()) : href
+    }
+
     private static func parseTimeEntry(_ el: [String: Any]) -> TimeEntry? {
         guard let id = el["id"] as? Int else { return nil }
         let links = el["_links"] as? [String: Any]

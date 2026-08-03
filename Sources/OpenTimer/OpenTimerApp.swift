@@ -9,10 +9,32 @@ enum WindowID {
 }
 
 /// Délégué d'app minimal : gère le clic sur l'icône du Dock pour (r)ouvrir la
-/// fenêtre « Nouveau » (qui affiche la session en cours si le chrono tourne).
+/// fenêtre « Nouveau » (qui affiche la session en cours si le chrono tourne), et
+/// ouvre cette même fenêtre automatiquement au lancement.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Fournie par la vue une fois l'action `openWindow` de l'environnement disponible.
-    var onReopen: (() -> Void)?
+    /// Si une ouverture au lancement était en attente, elle est déclenchée dès l'armement.
+    var onReopen: (() -> Void)? {
+        didSet {
+            if pendingLaunchOpen {
+                pendingLaunchOpen = false
+                onReopen?()
+            }
+        }
+    }
+
+    /// `true` si le lancement a eu lieu avant que l'action d'ouverture soit disponible.
+    private var pendingLaunchOpen = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Ouvre la fenêtre principale au lancement. Selon l'ordre d'initialisation SwiftUI,
+        // l'action peut ne pas être encore armée : on mémorise alors la demande.
+        if let onReopen {
+            onReopen()
+        } else {
+            pendingLaunchOpen = true
+        }
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         onReopen?()

@@ -15,6 +15,20 @@ final class TimerManager: ObservableObject {
     @Published var lastError: String?
     @Published var lastSaved: String?
 
+    /// Proposition de clôture affichée après un arrêt réussi : passer le WP en « Traité »
+    /// et le réaffecter à son créateur. `nil` = aucune proposition en attente.
+    @Published var pendingCompletion: PendingCompletion?
+
+    /// Données figées d'une proposition de clôture (le WP a déjà été désélectionné côté UI).
+    struct PendingCompletion {
+        let wp: WorkPackage
+        let lockVersion: Int
+        let statusHref: String?
+        let statusName: String
+        let assigneeHref: String?
+        let assigneeName: String?
+    }
+
     /// Instant de début du segment en cours (nil si en pause).
     private var segmentStart: Date?
     /// Temps cumulé des segments déjà terminés (figé pendant les pauses).
@@ -26,6 +40,7 @@ final class TimerManager: ObservableObject {
         guard !isRunning else { return }
         lastError = nil
         lastSaved = nil
+        pendingCompletion = nil
         activeWP = wp
         activeActivityHref = activityHref
         accumulated = 0
@@ -78,6 +93,7 @@ final class TimerManager: ObservableObject {
         ticker = nil
         isRunning = false
         isPaused = false
+        pendingCompletion = nil
 
         guard let api else {
             lastError = "Configure d'abord ton token dans Réglages."
@@ -102,10 +118,61 @@ final class TimerManager: ObservableObject {
             )
             lastSaved = "Enregistré : \(hours) sur #\(wp.id)"
             lastError = nil
+            // Une fois le temps enregistré, on propose de clôturer le WP.
+            await preparePendingCompletion(using: api, wp: wp)
         } catch {
             lastError = error.localizedDescription
         }
         reset()
+    }
+
+    /// Prépare (sans l'appliquer) la proposition de clôture : cherche le statut « Traité »
+    /// et le créateur du WP. Ne propose rien si aucune des deux actions n'est possible ;
+    /// toute erreur réseau est ignorée silencieusement (la proposition est facultative).
+    private func preparePendingCompletion(using api: OpenProjectAPI, wp: WorkPackage) async {
+        let statusHref: String? = (try? await api.statusHref(named: OpenProjectAPI.doneStatusName)) ?? nil
+        let detail = try? await api.workPackageCompletion(forHref: wp.href)
+        guard statusHref != nil || detail?.authorHref != nil else { return }
+        pendingCompletion = PendingCompletion(
+            wp: wp,
+            lockVersion: detail?.lockVersion ?? 0,
+            statusHref: statusHref,
+            statusName: OpenProjectAPI.doneStatusName,
+            assigneeHref: detail?.authorHref,
+            assigneeName: detail?.authorName
+        )
+    }
+
+    /// Applique la proposition de clôture : PATCH statut + assigné, puis l'efface.
+    func applyPendingCompletion(using api: OpenProjectAPI?) async {
+        guard let pending = pendingCompletion else { return }
+        guard let api else {
+            lastError = "Configure d'abord ton token dans Réglages."
+            pendingCompletion = nil
+            return
+        }
+        do {
+            try await api.updateWorkPackage(
+                href: pending.wp.href,
+                lockVersion: pending.lockVersion,
+                statusHref: pending.statusHref,
+                assigneeHref: pending.assigneeHref
+            )
+            var parts: [String] = []
+            if pending.statusHref != nil { parts.append("statut « \(pending.statusName) »") }
+            if let name = pending.assigneeName { parts.append("réaffecté à \(name)") }
+            else if pending.assigneeHref != nil { parts.append("réaffecté au créateur") }
+            lastSaved = "#\(pending.wp.id) — " + parts.joined(separator: ", ")
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+        pendingCompletion = nil
+    }
+
+    /// Écarte la proposition de clôture sans rien modifier.
+    func dismissPendingCompletion() {
+        pendingCompletion = nil
     }
 
     private func reset() {
