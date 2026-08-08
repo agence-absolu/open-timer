@@ -1,0 +1,80 @@
+name: Release
+
+# Versions découplées par plateforme : forcer la parité bloquerait dès la première
+# divergence de fonctionnalités.
+#   vX.Y.Z          → release macOS  (tag historique, inchangé)
+#   windows-vX.Y.Z  → release Windows
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'windows-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    if: startsWith(github.ref_name, 'v')
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build + zip
+        working-directory: macos
+        run: ./release.sh
+
+      - name: Vérifier que le tag correspond à l'Info.plist
+        working-directory: macos
+        run: |
+          PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PLIST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME ≠ CFBundleShortVersionString $PLIST_VERSION"
+            exit 1
+          fi
+
+      - name: Publier la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: macos/OpenTimer-*.zip
+          # Le sha256 doit être reporté à la main dans Casks/opentimer.rb (voir DEPLOY.md).
+          body: |
+            Build macOS (non signé, non notarisé — le cask retire la quarantaine).
+
+  windows:
+    if: startsWith(github.ref_name, 'windows-v')
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Vérifier que le tag correspond au csproj
+        working-directory: windows
+        shell: pwsh
+        run: |
+          $csproj = 'src/OpenTimer.Windows/OpenTimer.Windows.csproj'
+          $version = ([xml](Get-Content $csproj)).Project.PropertyGroup.Version | Where-Object { $_ }
+          $tag = $env:GITHUB_REF_NAME -replace '^windows-v', ''
+          if ($version -ne $tag) {
+            Write-Host "::error::Tag $env:GITHUB_REF_NAME ≠ <Version> $version"
+            exit 1
+          }
+
+      - name: Build + zip
+        working-directory: windows
+        shell: pwsh
+        run: ./release.ps1
+
+      - name: Publier la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: windows/OpenTimer-*-win-x64.zip
+          body: |
+            Build Windows x64, exécutable autonome (aucun runtime .NET à installer).
+
+            L'exécutable n'est pas signé : SmartScreen affichera un avertissement au
+            premier lancement — « Informations complémentaires » puis « Exécuter quand même ».

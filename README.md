@@ -1,9 +1,13 @@
 # OpenTimer
 
-Petit time tracker macOS pour **OpenProject**, qui vit dans la barre de menu.
-Choisis un work package parmi ceux qui te sont assignés, lance le chrono (le temps
-défile directement dans la barre de menu), et à l'arrêt un *time entry* est créé
-automatiquement dans OpenProject via l'API REST v3.
+Petit time tracker pour **OpenProject**, qui vit dans la barre de menu (macOS) ou la
+zone de notification (Windows). Choisis un work package parmi ceux qui te sont assignés,
+lance le chrono, et à l'arrêt un *time entry* est créé automatiquement dans OpenProject
+via l'API REST v3.
+
+Deux apps natives, une par plateforme — `macos/` (Swift + SwiftUI) et `windows/`
+(C# + WPF). Le reste de ce README décrit la version macOS ; pour Windows, voir
+[`windows/CLAUDE.md`](windows/CLAUDE.md).
 
 - Vit dans la **barre de menu** (le chrono y défile) et dispose d'une **icône dans le
   Dock** (alternée quand une session tourne).
@@ -19,6 +23,7 @@ automatiquement dans OpenProject via l'API REST v3.
 ## Build
 
 ```bash
+cd macos
 ./build.sh
 open OpenTimer.app
 ```

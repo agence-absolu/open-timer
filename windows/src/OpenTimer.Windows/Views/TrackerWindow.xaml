@@ -1,0 +1,81 @@
+<Window x:Class="OpenTimer.Views.TrackerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OpenTimer"
+        Width="520" Height="600" MinWidth="420" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Surface}">
+
+    <Grid Margin="18">
+
+        <!-- État 1 — connexion absente. -->
+        <StackPanel x:Name="NotConfiguredPanel" VerticalAlignment="Center" Visibility="Collapsed">
+            <TextBlock Text="Connexion à configurer" FontSize="16" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" />
+            <TextBlock Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,6,0,14"
+                       Text="Renseigne l'URL de ton instance OpenProject et ton token API." />
+            <Button Content="Ouvrir les préférences" Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Center" Click="OnOpenPreferences" />
+        </StackPanel>
+
+        <!-- État 2 — session en cours. -->
+        <StackPanel x:Name="RunningPanel" VerticalAlignment="Center" Visibility="Collapsed">
+            <TextBlock x:Name="RunningWpText" TextWrapping="Wrap" HorizontalAlignment="Center"
+                       TextAlignment="Center" Margin="0,0,0,10" />
+            <TextBlock x:Name="ElapsedText" FontSize="44" FontWeight="Light"
+                       Foreground="{StaticResource Recording}" HorizontalAlignment="Center"
+                       FontFamily="Consolas" />
+            <TextBlock x:Name="PausedHint" Style="{StaticResource Caption}" HorizontalAlignment="Center"
+                       Text="En pause" Visibility="Collapsed" Margin="0,4,0,0" />
+
+            <TextBlock Text="COMMENTAIRE" Style="{StaticResource SectionLabel}" Margin="0,20,0,4" />
+            <TextBox x:Name="RunningCommentBox" AcceptsReturn="True" Height="60"
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                <Button x:Name="PauseButton" Content="Pause" Style="{StaticResource PrimaryButton}"
+                        Click="OnPauseResume" />
+                <Button x:Name="StopButton" Content="Arrêter et enregistrer" Margin="10,0,0,0"
+                        Style="{StaticResource DangerButton}" Click="OnStop" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- État 3 — recherche et démarrage. -->
+        <DockPanel x:Name="PickerPanel" Visibility="Collapsed">
+
+            <StackPanel DockPanel.Dock="Top">
+                <TextBlock Text="WORK PACKAGE" Style="{StaticResource SectionLabel}" />
+                <TextBox x:Name="SearchBox" TextChanged="OnSearchTextChanged" />
+                <CheckBox x:Name="AllWorkPackagesBox" Content="Tous les work packages"
+                          Margin="0,8,0,0" Click="OnScopeToggled" />
+                <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0"
+                           Text="Décoché : filtre local sur mes WP. Coché : recherche serveur (libellé ou #id)." />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                <TextBlock Text="ACTIVITÉ" Style="{StaticResource SectionLabel}" />
+                <ComboBox x:Name="ActivityBox" DisplayMemberPath="Name" />
+
+                <TextBlock Text="COMMENTAIRE" Style="{StaticResource SectionLabel}" Margin="0,10,0,4" />
+                <TextBox x:Name="CommentBox" />
+
+                <TextBlock x:Name="StatusText" Style="{StaticResource Caption}" Margin="0,10,0,0" />
+
+                <Button x:Name="StartButton" Content="Démarrer" IsEnabled="False" Margin="0,10,0,0"
+                        Style="{StaticResource PrimaryButton}" Click="OnStart" />
+            </StackPanel>
+
+            <ListBox x:Name="WorkPackageList" Margin="0,10,0,0"
+                     SelectionChanged="OnWorkPackageSelected"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Display}" TextWrapping="Wrap" Margin="2,3" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+        </DockPanel>
+
+    </Grid>
+</Window>

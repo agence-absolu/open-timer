@@ -1,0 +1,54 @@
+name: CI
+
+# Vérifie que les deux plateformes compilent encore. Les jobs sont filtrés par chemin :
+# toucher au Swift ne relance pas le build Windows, et réciproquement.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chemins modifiés
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            macos:
+              - 'macos/**'
+              - '.github/workflows/ci.yml'
+
+      - name: Build
+        if: steps.changes.outputs.macos == 'true'
+        working-directory: macos
+        run: ./build.sh
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chemins modifiés
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            windows:
+              - 'windows/**'
+              - '.github/workflows/ci.yml'
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.changes.outputs.windows == 'true'
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        if: steps.changes.outputs.windows == 'true'
+        working-directory: windows
+        shell: pwsh
+        run: ./build.ps1

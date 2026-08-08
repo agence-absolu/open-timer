@@ -1,0 +1,10 @@
+<Application x:Class="OpenTimer.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <!-- Pas de StartupUri : l'app vit dans la zone de notification, les fenêtres
+         sont ouvertes à la demande depuis le menu du tray (voir TrayService). -->
+    <Application.Resources>
+        <ResourceDictionary Source="Views/Theme.xaml" />
+    </Application.Resources>
+</Application>

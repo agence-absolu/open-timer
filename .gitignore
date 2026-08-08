@@ -1,4 +1,12 @@
+# macOS
 .build/
 *.app
 *.zip
 .DS_Store
+
+# .NET / Windows
+bin/
+obj/
+dist/
+.vs/
+*.user

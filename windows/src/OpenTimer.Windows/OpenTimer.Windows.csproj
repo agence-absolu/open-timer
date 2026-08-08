@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- WPF pour les fenêtres, WinForms pour NotifyIcon (zone de notification) et
+         System.Drawing (rendu dynamique de l'icône du chrono). Les deux viennent du
+         runtime WindowsDesktop : aucun paquet NuGet, conforme au « zéro dépendance ». -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyName>OpenTimer</AssemblyName>
+    <RootNamespace>OpenTimer</RootNamespace>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+
+    <!-- Source de vérité de la version pour release.ps1 (pendant du CFBundleShortVersionString). -->
+    <Version>0.1.0</Version>
+    <Company>LMWR</Company>
+    <Product>OpenTimer</Product>
+    <Description>Time tracker OpenProject pour Windows</Description>
+
+    <!-- Publication : exécutable unique, autonome, sans runtime .NET à installer. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Pas de trimming : WPF ne le supporte pas. -->
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
+    <Resource Include="Resources\running.ico" />
+  </ItemGroup>
+
+</Project>

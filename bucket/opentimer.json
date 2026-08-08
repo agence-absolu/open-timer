@@ -1,0 +1,36 @@
+{
+    "version": "0.1.0",
+    "description": "Time tracker pour OpenProject dans la zone de notification",
+    "homepage": "https://github.com/agence-absolu/open-timer",
+    "license": "Proprietary",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/agence-absolu/open-timer/releases/download/windows-v0.1.0/OpenTimer-0.1.0-win-x64.zip",
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+    },
+    "bin": "OpenTimer.exe",
+    "shortcuts": [
+        [
+            "OpenTimer.exe",
+            "OpenTimer"
+        ]
+    ],
+    "persist": [],
+    "notes": [
+        "L'exécutable n'est pas signé : SmartScreen peut avertir au premier lancement.",
+        "Réglages stockés dans %APPDATA%\\OpenTimer (le token y est chiffré via DPAPI).",
+        "Configuration : icône de la zone de notification -> Préférences."
+    ],
+    "checkver": {
+        "github": "https://github.com/agence-absolu/open-timer",
+        "regex": "windows-v([\\d.]+)"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/agence-absolu/open-timer/releases/download/windows-v$version/OpenTimer-$version-win-x64.zip"
+            }
+        }
+    }
+}
