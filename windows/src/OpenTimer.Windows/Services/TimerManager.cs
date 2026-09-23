@@ -137,7 +137,14 @@ public sealed class TimerManager : INotifyPropertyChanged
         }
 
         var hours = OpenProjectApi.IsoDuration(seconds);
-        var today = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        // Heure de début envoyée si l'instance l'accepte : bloc continu qui se termine à
+        // l'arrêt et dure exactement `hours` (OpenProject calcule la fin = début + durée ;
+        // les pauses ne sont donc pas représentées). `spentOn` doit être le jour du début.
+        var stoppedAt = DateTime.UtcNow;
+        var startedAt = stoppedAt.AddMinutes(-OpenProjectApi.RoundedMinutes(seconds));
+        var sendStart = await api.StartEndSupportedAsync(wp.Href);
+        var spentOn = (sendStart ? startedAt : stoppedAt).ToLocalTime()
+            .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         try
         {
             // Activité choisie au démarrage ; sinon la première autorisée (requise par OP).
@@ -154,7 +161,8 @@ public sealed class TimerManager : INotifyPropertyChanged
                 }
             }
 
-            await api.CreateTimeEntryAsync(wp.Href, hours, today, comment, activityHref);
+            await api.CreateTimeEntryAsync(wp.Href, hours, spentOn, comment, activityHref,
+                sendStart ? OpenProjectApi.UtcString(startedAt) : null);
             LastSaved = $"Enregistré : {hours} sur #{wp.Id}";
             LastError = null;
 

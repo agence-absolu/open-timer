@@ -96,6 +96,10 @@ dans l'environnement SwiftUI (`TimerManager`, `SettingsStore`).
   « Développement » si disponible.
 - **Heures début/fin** : écrites seulement si l'instance active l'option admin
   (`startEndSupported`). Sinon seules durée + date sont envoyées, et l'UI le signale.
+  Seul `startTime` est accepté en écriture : OpenProject calcule `endTime` (= début + `hours`)
+  et répond 500 si on l'envoie. Les secondes sont tronquées et la date locale de `startTime`
+  doit égaler `spentOn`. À l'arrêt du chrono, le début envoyé = arrêt − durée (pauses non
+  représentées). Sans heures côté serveur, l'éditeur reconstitue la fin depuis `createdAt`.
 - **Concurrence** : `TimerManager` et `SettingsStore` sont `@MainActor` ; les formatteurs
   statiques sont `nonisolated`.
 

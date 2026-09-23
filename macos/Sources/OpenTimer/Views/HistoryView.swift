@@ -156,9 +156,13 @@ struct TimeEntryEditView: View {
         self.onDone = onDone
         _comment = State(initialValue: entry.comment)
 
+        // Sans heures début/fin côté serveur (option désactivée), la fin est reconstituée à
+        // partir de `createdAt` : l'app crée la saisie à l'arrêt du chrono. On garde le jour
+        // de `spentOn` (il a pu être modifié depuis). L'heure courante n'est qu'un dernier recours.
         let day = Formatters.ymd.date(from: entry.spentOn) ?? Date()
         let duration = TimeInterval(entry.seconds)
-        let seededEnd = entry.endTime ?? Self.combine(day: day, timeFrom: Date())
+        let seededEnd = entry.endTime
+            ?? Self.combine(day: day, timeFrom: entry.createdAt ?? Date())
         let seededStart = entry.startTime ?? seededEnd.addingTimeInterval(-duration)
         _start = State(initialValue: seededStart)
         _end = State(initialValue: entry.endTime ?? seededStart.addingTimeInterval(duration))
@@ -287,8 +291,7 @@ struct TimeEntryEditView: View {
                 spentOn: spentOn,
                 comment: comment,
                 lockVersion: entry.lockVersion,
-                startTimeUTC: sendTimes ? OpenProjectAPI.utcString(start) : nil,
-                endTimeUTC: sendTimes ? OpenProjectAPI.utcString(end) : nil
+                startTimeUTC: sendTimes ? OpenProjectAPI.utcString(start) : nil
             )
             onDone()
         } catch {

@@ -9,6 +9,7 @@ namespace OpenTimer.Models;
 /// <param name="Seconds">Durée en secondes, parsée depuis le champ ISO 8601 <c>hours</c>.</param>
 /// <param name="StartTime">Instant de début en UTC (si l'option est activée sur l'instance).</param>
 /// <param name="EndTime">Instant de fin en UTC (idem).</param>
+/// <param name="CreatedAt">Création de la saisie en UTC = arrêt du chrono pour les saisies faites par l'app.</param>
 /// <param name="LockVersion">Verrou optimiste requis par OpenProject pour le PATCH.</param>
 public sealed record TimeEntry(
     int Id,
@@ -20,6 +21,7 @@ public sealed record TimeEntry(
     int Seconds,
     DateTime? StartTime,
     DateTime? EndTime,
+    DateTime? CreatedAt,
     int? LockVersion)
 {
     /// <summary>ID numérique du work package, extrait du href HAL (<c>/api/v3/work_packages/{id}</c>).</summary>

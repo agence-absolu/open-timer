@@ -11,6 +11,7 @@ struct TimeEntry: Identifiable, Hashable {
     let seconds: Int      // durée en secondes, parsée depuis le champ ISO 8601 `hours`
     let startTime: Date?  // instant de début en UTC (si l'option est activée sur l'instance)
     let endTime: Date?    // instant de fin en UTC (idem)
+    let createdAt: Date?  // création de la saisie = arrêt du chrono pour les saisies faites par l'app
     let lockVersion: Int?
 
     /// ID numérique du work package, extrait du href HAL (`/api/v3/work_packages/{id}`).

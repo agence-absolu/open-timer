@@ -85,7 +85,9 @@ sépare pas davantage.
   `UpdateTimeEntryAsync` / `DeleteTimeEntryAsync` existent déjà côté API.
 - **Thème clair/sombre** : `SettingsStore.Appearance` est persisté mais `Theme.xaml` ne
   définit qu'un jeu de couleurs clair.
-- **Heures début/fin** (`StartEndSupportedAsync`) : l'API est portée, l'UI ne s'en sert pas.
+- **Heures début/fin** (`StartEndSupportedAsync`) : `TimerManager.StopAsync` envoie `startTime`
+  à la création, mais l'historique ne les affiche ni ne les édite pas encore. Voir
+  `macos/CLAUDE.md` pour les contraintes de l'API (`endTime` non inscriptible).
 
 ## Release
 

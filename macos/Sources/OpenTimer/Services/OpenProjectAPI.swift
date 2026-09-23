@@ -100,12 +100,15 @@ struct OpenProjectAPI {
     }
 
     /// Crée un time entry. `hours` est une durée ISO 8601 (ex. "PT1H23M").
+    /// `startTimeUTC` n'est accepté que si l'instance autorise les heures début/fin
+    /// (voir `startEndSupported`) ; sa date locale doit alors être égale à `spentOn`.
     func createTimeEntry(
         workPackageHref: String,
         hours: String,
         spentOn: String,
         comment: String,
-        activityHref: String?
+        activityHref: String?,
+        startTimeUTC: String? = nil
     ) async throws {
         var links: [String: Any] = ["workPackage": ["href": workPackageHref]]
         if let activityHref { links["activity"] = ["href": activityHref] }
@@ -116,6 +119,7 @@ struct OpenProjectAPI {
             "_links": links,
         ]
         if !comment.isEmpty { payload["comment"] = ["raw": comment] }
+        if let startTimeUTC { payload["startTime"] = startTimeUTC }
 
         let body = try JSONSerialization.data(withJSONObject: payload)
         _ = try await send(request(path: "api/v3/time_entries", method: "POST", body: body))
@@ -141,15 +145,16 @@ struct OpenProjectAPI {
         return elements.compactMap(Self.parseTimeEntry)
     }
 
-    /// Met à jour une saisie (durée, date, commentaire, + heures début/fin si supportées).
+    /// Met à jour une saisie (durée, date, commentaire, + heure de début si supportée).
+    /// Pas de `endTime` : OpenProject le calcule (`startTime` + `hours`) et refuse de
+    /// l'écrire (erreur 500 `undefined method 'end_time='`).
     func updateTimeEntry(
         id: Int,
         seconds: Int,
         spentOn: String,
         comment: String,
         lockVersion: Int?,
-        startTimeUTC: String? = nil,
-        endTimeUTC: String? = nil
+        startTimeUTC: String? = nil
     ) async throws {
         var payload: [String: Any] = [
             "hours": Self.isoDurationPrecise(seconds: seconds),
@@ -157,7 +162,6 @@ struct OpenProjectAPI {
             "comment": ["raw": comment],
         ]
         if let startTimeUTC { payload["startTime"] = startTimeUTC }
-        if let endTimeUTC { payload["endTime"] = endTimeUTC }
         if let lockVersion { payload["lockVersion"] = lockVersion }
         let body = try JSONSerialization.data(withJSONObject: payload)
         _ = try await send(request(path: "api/v3/time_entries/\(id)", method: "PATCH", body: body))
@@ -251,6 +255,7 @@ struct OpenProjectAPI {
             seconds: seconds(fromISODuration: hours),
             startTime: parseUTC(el["startTime"] as? String),
             endTime: parseUTC(el["endTime"] as? String),
+            createdAt: parseUTC(el["createdAt"] as? String),
             lockVersion: el["lockVersion"] as? Int
         )
     }
@@ -309,13 +314,18 @@ struct OpenProjectAPI {
 
     /// Convertit une durée en secondes vers une durée ISO 8601 arrondie à la minute (min. 1 min).
     static func isoDuration(seconds: Int) -> String {
-        let totalMinutes = max(1, Int((Double(seconds) / 60.0).rounded()))
+        let totalMinutes = roundedMinutes(seconds: seconds)
         let h = totalMinutes / 60
         let m = totalMinutes % 60
         var out = "PT"
         if h > 0 { out += "\(h)H" }
         if m > 0 || h == 0 { out += "\(m)M" }
         return out
+    }
+
+    /// Nombre de minutes retenu par `isoDuration` (arrondi à la minute, min. 1 min).
+    static func roundedMinutes(seconds: Int) -> Int {
+        max(1, Int((Double(seconds) / 60.0).rounded()))
     }
 
     /// Durée ISO 8601 précise (heures/minutes/secondes exactes), pour l'édition.

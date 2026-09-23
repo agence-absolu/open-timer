@@ -128,10 +128,15 @@ public sealed class OpenProjectApi
         return result;
     }
 
-    /// <summary>Crée un time entry. <paramref name="hours"/> est une durée ISO 8601 (ex. « PT1H23M »).</summary>
+    /// <summary>
+    /// Crée un time entry. <paramref name="hours"/> est une durée ISO 8601 (ex. « PT1H23M »).
+    /// <paramref name="startTimeUtc"/> n'est accepté que si l'instance autorise les heures
+    /// début/fin (voir <see cref="StartEndSupportedAsync"/>) ; sa date locale doit alors être
+    /// égale à <paramref name="spentOn"/>.
+    /// </summary>
     public async Task CreateTimeEntryAsync(
         string workPackageHref, string hours, string spentOn, string comment,
-        string? activityHref, CancellationToken ct = default)
+        string? activityHref, string? startTimeUtc = null, CancellationToken ct = default)
     {
         var links = new Dictionary<string, object?>
         {
@@ -148,6 +153,7 @@ public sealed class OpenProjectApi
         };
         if (comment.Length > 0)
             payload["comment"] = new Dictionary<string, object?> { ["raw"] = comment };
+        if (startTimeUtc is not null) payload["startTime"] = startTimeUtc;
 
         (await SendAsync(HttpMethod.Post, "api/v3/time_entries", Json(payload), ct)).Dispose();
     }
@@ -171,10 +177,14 @@ public sealed class OpenProjectApi
         return result;
     }
 
-    /// <summary>Met à jour une saisie (durée, date, commentaire, + heures début/fin si supportées).</summary>
+    /// <summary>
+    /// Met à jour une saisie (durée, date, commentaire, + heure de début si supportée).
+    /// Pas de <c>endTime</c> : OpenProject le calcule (<c>startTime</c> + <c>hours</c>) et
+    /// refuse de l'écrire (erreur 500 <c>undefined method 'end_time='</c>).
+    /// </summary>
     public async Task UpdateTimeEntryAsync(
         int id, int seconds, string spentOn, string comment, int? lockVersion,
-        string? startTimeUtc = null, string? endTimeUtc = null, CancellationToken ct = default)
+        string? startTimeUtc = null, CancellationToken ct = default)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -183,7 +193,6 @@ public sealed class OpenProjectApi
             ["comment"] = new Dictionary<string, object?> { ["raw"] = comment },
         };
         if (startTimeUtc is not null) payload["startTime"] = startTimeUtc;
-        if (endTimeUtc is not null) payload["endTime"] = endTimeUtc;
         if (lockVersion is not null) payload["lockVersion"] = lockVersion.Value;
 
         (await SendAsync(HttpMethod.Patch, $"api/v3/time_entries/{id}", Json(payload), ct)).Dispose();
@@ -372,6 +381,7 @@ public sealed class OpenProjectApi
             Seconds: SecondsFromIsoDuration(Str(el, "hours") ?? "PT0S"),
             StartTime: ParseUtc(Str(el, "startTime")),
             EndTime: ParseUtc(Str(el, "endTime")),
+            CreatedAt: ParseUtc(Str(el, "createdAt")),
             LockVersion: Int(el, "lockVersion"));
     }
 
@@ -426,7 +436,7 @@ public sealed class OpenProjectApi
     /// <summary>Convertit une durée en secondes vers une durée ISO 8601 arrondie à la minute (min. 1 min).</summary>
     public static string IsoDuration(int seconds)
     {
-        var totalMinutes = Math.Max(1, (int)Math.Round(seconds / 60.0, MidpointRounding.AwayFromZero));
+        var totalMinutes = RoundedMinutes(seconds);
         var h = totalMinutes / 60;
         var m = totalMinutes % 60;
         var sb = new StringBuilder("PT");
@@ -434,6 +444,10 @@ public sealed class OpenProjectApi
         if (m > 0 || h == 0) sb.Append(CultureInfo.InvariantCulture, $"{m}M");
         return sb.ToString();
     }
+
+    /// <summary>Nombre de minutes retenu par <see cref="IsoDuration"/> (arrondi à la minute, min. 1 min).</summary>
+    public static int RoundedMinutes(int seconds) =>
+        Math.Max(1, (int)Math.Round(seconds / 60.0, MidpointRounding.AwayFromZero));
 
     /// <summary>Durée ISO 8601 précise (heures/minutes/secondes exactes), pour l'édition.</summary>
     public static string IsoDurationPrecise(int seconds)

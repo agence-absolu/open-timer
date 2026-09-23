@@ -102,7 +102,15 @@ final class TimerManager: ObservableObject {
         }
 
         let hours = OpenProjectAPI.isoDuration(seconds: seconds)
-        let today = Formatters.ymd.string(from: Date())
+        // Heure de début envoyée si l'instance l'accepte : bloc continu qui se termine à
+        // l'arrêt et dure exactement `hours` (OpenProject calcule la fin = début + durée ;
+        // les pauses ne sont donc pas représentées). `spentOn` doit être le jour du début.
+        let stoppedAt = Date()
+        let startedAt = stoppedAt.addingTimeInterval(
+            -TimeInterval(OpenProjectAPI.roundedMinutes(seconds: seconds) * 60)
+        )
+        let sendStart = await api.startEndSupported(forWorkPackageHref: wp.href)
+        let spentOn = Formatters.ymd.string(from: sendStart ? startedAt : stoppedAt)
         do {
             // Activité choisie au démarrage ; sinon la première autorisée (requise par OP).
             var activityHref = activeActivityHref
@@ -112,9 +120,10 @@ final class TimerManager: ObservableObject {
             try await api.createTimeEntry(
                 workPackageHref: wp.href,
                 hours: hours,
-                spentOn: today,
+                spentOn: spentOn,
                 comment: comment,
-                activityHref: activityHref
+                activityHref: activityHref,
+                startTimeUTC: sendStart ? OpenProjectAPI.utcString(startedAt) : nil
             )
             lastSaved = "Enregistré : \(hours) sur #\(wp.id)"
             lastError = nil
