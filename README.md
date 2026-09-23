@@ -6,8 +6,8 @@ lance le chrono, et à l'arrêt un *time entry* est créé automatiquement dans 
 via l'API REST v3.
 
 Deux apps natives, une par plateforme — `macos/` (Swift + SwiftUI) et `windows/`
-(C# + WPF). Le reste de ce README décrit la version macOS ; pour Windows, voir
-[`windows/CLAUDE.md`](windows/CLAUDE.md).
+(C# + WPF). Le reste de ce README décrit la version macOS, qui est la référence
+fonctionnelle ; pour Windows, voir [`windows/README.md`](windows/README.md).
 
 - Vit dans la **barre de menu** (le chrono y défile) et dispose d'une **icône dans le
   Dock** (alternée quand une session tourne).
@@ -54,7 +54,11 @@ et d'activer le **lancement au démarrage** de la session.
    d'autres (recherche serveur : libellé, ou id exact si tu tapes un numéro).
 3. **Démarrer** → le chrono défile dans la barre de menu (`● 0:01:23`). Tu peux
    **mettre en pause / reprendre** ; l'icône du Dock indique la session active.
-4. **Arrêter** → time entry créé sur le WP (durée arrondie à la minute, date du jour).
+4. **Arrêter** → time entry créé sur le WP (durée arrondie à la minute). Si l'instance
+   autorise les heures de début/fin, la saisie est horodatée : elle se termine à l'arrêt
+   et commence « arrêt − durée » (les pauses ne sont pas représentées).
+5. L'app propose ensuite de **clôturer le WP** : statut « Traité » et réaffectation à
+   son créateur (facultatif).
 
 ## Corriger une saisie (oubli d'arrêt)
 
@@ -63,9 +67,11 @@ Icône de la barre de menu → **Historique**. Clique une saisie pour l'éditer 
 quand on a oublié d'arrêter : on corrige la Fin, la durée suit. On peut aussi
 **supprimer** une saisie.
 
-> Les heures de début/fin ne sont écrites dans OpenProject que si l'admin a activé
-> l'option *« heures de début et de fin »* (Administration → Suivi du temps). Sinon,
-> seules la **durée** et la **date** sont enregistrées (l'app te le signale).
+> Les heures de début/fin ne sont enregistrées dans OpenProject que si un admin a
+> activé le **suivi exact du temps** (*Administration → Temps et coûts*, option
+> « Autoriser le suivi exact du temps »). Sinon, seules la **durée** et la **date** sont
+> enregistrées (l'app te le signale) : l'éditeur reconstitue alors la fin à partir de
+> l'heure de création de la saisie, qui correspond à l'arrêt du chrono.
 
 ## Installer
 
@@ -82,8 +88,27 @@ processus de release. L'app étant non signée, le cask retire lui-même la quar
 ### Manuellement
 
 ```bash
-cp -R OpenTimer.app /Applications/
+cp -R macos/OpenTimer.app /Applications/
 ```
+
+## Développement
+
+Pas de hot reload ni de suite de tests : on recompile, on relance, on vérifie dans l'app
+contre une vraie instance OpenProject (sur des WP de test — les saisies sont réelles).
+
+```bash
+cd macos
+./build.sh && open OpenTimer.app      # quitter l'instance précédente avant (menu → Quitter)
+```
+
+- **Cohabitation avec la version Homebrew** : pas besoin de la désinstaller. Les deux
+  partagent les mêmes préférences (URL, token) ; quitte l'une avant de lancer l'autre et
+  lance le build de dev par son chemin (`open macos/OpenTimer.app`).
+- **CI** : chaque push compile macOS et/ou Windows selon les fichiers modifiés. Le port
+  Windows ne se compile pas sur macOS : la CI fait foi.
+- Architecture, conventions et pièges : [`CLAUDE.md`](CLAUDE.md), puis
+  [`macos/CLAUDE.md`](macos/CLAUDE.md) / [`windows/CLAUDE.md`](windows/CLAUDE.md).
+- Publier une version : [`DEPLOY.md`](DEPLOY.md).
 
 ## Pistes suivantes
 

@@ -15,6 +15,11 @@ la suit.
 - **Version courante** : `<Version>` dans `src/OpenTimer.Windows/OpenTimer.Windows.csproj`
   (source de vérité pour la release, pendant du `CFBundleShortVersionString`).
 - Pas de suite de tests. La vérification se fait en lançant l'app.
+- **Build impossible sur macOS** (pas de targeting pack WindowsDesktop) : sans machine
+  Windows, c'est le job `windows` de la CI (`ci.yml`) qui valide la compilation.
+- `ImplicitUsings` ne couvre pas `System.Net.Http` pour ce SDK : l'importer explicitement.
+  WPF **et** WinForms étant actifs, `MessageBox` est ambigu → écrire
+  `System.Windows.MessageBox`.
 
 ## Stack
 
@@ -92,11 +97,13 @@ sépare pas davantage.
 ## Release
 
 1. Bumper `<Version>` dans `src/OpenTimer.Windows/OpenTimer.Windows.csproj`.
-2. `./release.ps1` → build + zip + `sha256`.
-3. Reporter `version` + `hash` dans `../bucket/opentimer.json` (bucket Scoop, à la racine
-   du dépôt — Scoop impose ce chemin, comme Homebrew impose `Casks/`).
-4. Pousser le tag `windows-vX.Y.Z` — le workflow `release.yml` vérifie que le tag correspond
-   au csproj, rebuild et publie la release.
+2. Commit + push, puis pousser le tag `windows-vX.Y.Z` — le workflow `release.yml` vérifie
+   que le tag correspond au csproj, lance `release.ps1` (build + zip) et publie la release.
+3. Reporter `version` + `hash` **du zip publié par la CI**
+   (`gh release view windows-vX.Y.Z --json assets`) dans `../bucket/opentimer.json`
+   (bucket Scoop, à la racine du dépôt — Scoop impose ce chemin, comme Homebrew impose
+   `Casks/`), puis commit + push. Pas le hash d'un `release.ps1` local : la CI recompile,
+   les deux zips diffèrent (même piège que le cask, voir `../DEPLOY.md`).
 
 Côté utilisateur : `scoop bucket add open-timer https://github.com/agence-absolu/open-timer`
 puis `scoop install opentimer`. Scoop n'exige pas de signature — c'est le pendant naturel du

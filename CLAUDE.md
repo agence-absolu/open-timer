@@ -24,9 +24,6 @@ REST v3.
   d'abord côté macOS ; le port Windows la suit. En cas de divergence de comportement non
   documentée, macOS fait foi.
 
-> Note : le `README.md` décrit encore l'app comme « menu-bar-only, token dans le
-> trousseau » — c'est obsolète. Ces `CLAUDE.md` font foi sur l'état actuel.
-
 ## Organisation du dépôt
 
 ```
@@ -57,6 +54,17 @@ mêmes utilitaires ISO 8601. `windows/…/Services/OpenProjectApi.cs` est un por
 alignés (`myWorkPackages` ↔ `MyWorkPackagesAsync`). Idem pour `TimerManager`, dont le modèle
 « segments cumulés » est identique.
 
+## Développer et vérifier
+
+- **Pas de suite de tests**, sur aucune plateforme : on vérifie en lançant l'app contre une
+  vraie instance OpenProject. Les saisies et clôtures de WP écrivent de vraies données :
+  tester sur des WP de test, et supprimer les saisies de test ensuite.
+- **Sonder l'API sans rien écrire** : `POST /api/v3/time_entries/form` valide un payload
+  et renvoie le schéma (champs `writable`, erreurs de validation) sans créer la saisie.
+  C'est ainsi qu'on a établi que `endTime` n'est pas inscriptible.
+- **CI** (`ci.yml`) : compile chaque plateforme quand ses fichiers changent. C'est le seul
+  moyen de compiler le port Windows depuis un Mac.
+
 ## Versions et releases
 
 Les versions sont **découplées par plateforme** — forcer la parité bloquerait dès la
@@ -69,6 +77,10 @@ première divergence de fonctionnalités.
 
 `.github/workflows/release.yml` vérifie que le tag correspond à la version déclarée, rebuild
 et publie la release. Le détail de chaque procédure est dans le `CLAUDE.md` de la plateforme.
+
+Piège commun : le sha256 du cask / du manifeste Scoop doit être celui **du zip publié par
+la CI**, jamais celui d'un build local (les zips diffèrent d'un build à l'autre). On pousse
+donc le tag d'abord, puis on met à jour `Casks/` ou `bucket/` dans un second commit.
 
 **Aucune des deux apps n'est signée** : macOS contourne la quarantaine via un `postflight`
 de cask, Windows affiche un avertissement SmartScreen. C'est un arbitrage assumé

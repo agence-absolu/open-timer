@@ -17,6 +17,13 @@ open OpenTimer.app
   vérité pour la release).
 - Cible macOS 13+ (`.macOS(.v13)`). Pas de suite de tests : la vérification se fait en
   lançant l'app.
+- Itération rapide : `swift build && .build/debug/OpenTimer`. Sans bundle, les `.icns` du
+  Dock ne sont pas chargés et les préférences peuvent ne pas être celles du `.app` :
+  valider avec `./build.sh`.
+- **Cohabitation avec la version Homebrew** (`/Applications/OpenTimer.app`) : même bundle id,
+  donc **mêmes préférences** (URL, token). Quitter l'une avant de lancer l'autre (sinon
+  deux chronos) et lancer le build de dev par son chemin (`open macos/OpenTimer.app`,
+  pas `open -a OpenTimer`).
 
 ## Présence
 
@@ -109,12 +116,16 @@ Le dépôt public **`agence-absolu/open-timer`** est à la fois code source, tap
 (`Casks/opentimer.rb`, **à la racine du dépôt** — Homebrew impose ce chemin) et hôte des
 artefacts (GitHub Releases). Détails dans `../DEPLOY.md`.
 
-À chaque version :
+À chaque version (détail dans `../DEPLOY.md`) :
 1. Bumper `CFBundleShortVersionString` (et `CFBundleVersion`) dans `Resources/Info.plist`.
-2. `./release.sh` → build + zip (`ditto`, préserve la signature ad-hoc) + `sha256`.
-3. Reporter `version` + `sha256` dans `../Casks/opentimer.rb`.
-4. Commit + push, puis pousser le tag `vX.Y.Z` (le workflow `release.yml` vérifie la
-   cohérence tag ↔ Info.plist, rebuild et publie la release).
+2. Commit + push, puis pousser le tag `vX.Y.Z` : le workflow `release.yml` lance
+   `release.sh` (build + zip `ditto`), vérifie la cohérence tag ↔ Info.plist et publie.
+3. Reporter `version` + le sha256 **du zip publié** (`gh release view vX.Y.Z --json assets`)
+   dans `../Casks/opentimer.rb`, puis commit + push.
+
+**Jamais le sha256 d'un zip local** : la CI recompile, et deux builds ne produisent
+jamais le même zip → `brew upgrade` échouerait (checksum). Jusqu'à la 0.7.0, les releases
+étaient publiées à la main, d'où l'ancienne procédure « sha256 local ».
 
 Côté utilisateur : `brew tap agence-absolu/open-timer <url>` puis `brew install --cask opentimer`.
 L'app étant **non signée / non notarisée**, le cask retire la quarantaine via un

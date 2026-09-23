@@ -9,32 +9,42 @@ artefacts (GitHub Releases).
 
 ## À chaque version
 
-1. **Bumper la version** dans `macos/Resources/Info.plist`
-   (`CFBundleShortVersionString`, ex. `0.1.0` → `0.2.0`).
+> ⚠️ **Le sha256 du cask doit être celui du zip publié par la CI**, pas celui d'un zip
+> construit en local : le workflow recompile l'app, et deux builds (signature ad-hoc,
+> horodatages) ne donnent jamais le même zip. Un sha256 local ferait échouer
+> `brew upgrade` sur une erreur de checksum. D'où les deux commits ci-dessous.
 
-2. **Construire l'artefact + sha256** :
+1. **Bumper la version** dans `macos/Resources/Info.plist` :
+   `CFBundleShortVersionString` (ex. `0.7.0` → `0.7.1`) et `CFBundleVersion` (+1).
    ```bash
-   cd macos && ./release.sh
-   ```
-   Note la `version` et le `sha256` affichés, et le fichier `OpenTimer-<version>.zip`.
-
-3. **Reporter version + sha256** dans `Casks/opentimer.rb`.
-
-4. **Commit + push** du code et du cask :
-   ```bash
-   git add -A && git commit -m "Release vX.Y.Z" && git push
+   cd macos
+   /usr/libexec/PlistBuddy -c "Set CFBundleShortVersionString X.Y.Z" -c "Set CFBundleVersion N" Resources/Info.plist
+   ./build.sh    # vérifie que ça compile
    ```
 
-5. **Pousser le tag `vX.Y.Z`** — le workflow `.github/workflows/release.yml` vérifie
-   que le tag correspond à l'`Info.plist`, rebuild et publie la release avec le zip :
+2. **Commit + push du code, puis du tag** — le cask n'est **pas** encore touché :
    ```bash
+   git commit -m "vX.Y.Z — description courte" && git push
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-   (Manuellement si besoin : Releases → Draft a new release → tag `vX.Y.Z` →
-   glisser `OpenTimer-<version>.zip` → Publish.)
+   Le workflow `.github/workflows/release.yml` exécute `macos/release.sh`, vérifie que le
+   tag correspond à l'`Info.plist` et publie la release avec `OpenTimer-X.Y.Z.zip`.
+   Suivi : `gh run list --workflow release.yml`.
+
+3. **Récupérer le sha256 du zip publié** :
+   ```bash
+   gh release view vX.Y.Z --json assets --jq '.assets[] | "\(.name) \(.digest)"'
+   ```
+
+4. **Reporter `version` + `sha256`** dans `Casks/opentimer.rb`, puis commit + push
+   (`Cask opentimer X.Y.Z`). C'est ce commit qui rend la version visible pour
+   `brew upgrade`.
 
 L'URL du zip dans le cask doit correspondre :
 `https://github.com/agence-absolu/open-timer/releases/download/vX.Y.Z/OpenTimer-X.Y.Z.zip`
+
+`macos/release.sh` reste utilisable en local pour tester l'empaquetage ; le sha256 qu'il
+affiche ne doit simplement pas finir dans le cask.
 
 ## Installation (côté utilisateurs)
 
