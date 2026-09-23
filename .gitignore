@@ -10,3 +10,5 @@ obj/
 dist/
 .vs/
 *.user
+# IDE JetBrains
+.idea/
