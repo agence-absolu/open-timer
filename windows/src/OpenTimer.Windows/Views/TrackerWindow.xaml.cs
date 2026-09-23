@@ -233,7 +233,7 @@ public partial class TrackerWindow : Window
         if (pending.AssigneeName is { } name) parts.Add($"réaffecter à {name}");
         else if (pending.AssigneeHref is not null) parts.Add("réaffecter au créateur");
 
-        var answer = MessageBox.Show(
+        var answer = System.Windows.MessageBox.Show(
             $"Clôturer #{pending.Wp.Id} ?\n\n{string.Join("\net ", parts)}.",
             "OpenTimer", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
